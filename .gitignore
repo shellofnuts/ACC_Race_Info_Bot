@@ -1,2 +1,6 @@
 
 discord_tokens.env
+
+*.json
+
+RaceResults.csv
