@@ -35,6 +35,10 @@ print(f'{TOKEN} \n{SERVER}')
 
 bot = commands.Bot(command_prefix='!')
 
+### Discord IDs
+
+disIDs = [761495523898556427, 246290545348050945, 374245587387809793]
+
 ### BOT EVENTS
 
 @bot.event
@@ -45,7 +49,7 @@ async def on_ready():
 async def on_message(message):
 	if message.author == bot.user:
 		return
-	if not message.content.startswith('!') and message.author.id == 761495523898556427: 	#	Ignores commands
+	if not message.content.startswith('!') and message.author.id in disIDs and message.channel.id == 876749209339047936: 	#	Ignores commands
 		emoji = discord.utils.get(message.guild.emojis, name='KEKW')
 		await message.add_reaction(emoji)
 		print(f'Reacted to {message.author} with KEKW')
@@ -53,32 +57,63 @@ async def on_message(message):
 
 ### BOT COMMANDS
 
-@bot.command(name='test', pass_context=True)
+@bot.command(name='test', pass_context=True, help='Test command to make sure the bot is working')
 async def test_response(ctx):
 	response = 'This is a test'
+	if ctx.message.author.id in disIDs:
+		emoji = discord.utils.get(ctx.message.guild.emojis, name='KEKW')
+		print(f'Replied KEKW to {ctx.message.author}')
+		await ctx.message.add_reaction(emoji)
+		return
 	await ctx.send(response + f' {ctx.message.author.mention}!')
 	print(f'Replied to {ctx.message.author}')
 
-@bot.command(name='standings', pass_context=True)
+@bot.command(name='standings', pass_context=True, help="Returns the current league standings!")
 async def standings(ctx):
-	response = f'{ctx.message.author.mention}, the current standings are:'
-	figure = ACC.Standings('RaceResults')
+	await ctx.send('Grabbing data...')
+
+	results = ACC.PullData('Celbridge ACC Points', 0)
+	results.authClient()
+	figure = ACC.Standings(results.getDataFrame())
 	figure.getTable()
 	figurename = figure.output
+
+	response = f'{ctx.message.author.mention}, the current standings are:'
 	await ctx.send(response)
 	await ctx.channel.send(file=discord.File(figurename))
 	os.remove(figurename)
 	print(f"Gave standings to {ctx.message.author}")
 
-@bot.command(name='totalresults', pass_context=True)
+@bot.command(name='raceresults', pass_context=True, help="Returns the results of all of the races so far!")
 async def total_results(ctx):
-	response = f'{ctx.message.author.mention}, the current results are:'
-	figure = ACC.RaceResults('RaceResults')
+	await ctx.send('Grabbing data...')
+
+	results = ACC.PullData('Celbridge ACC Points', 0)
+	results.authClient()
+	figure = ACC.RaceResults(results.getDataFrame())
 	figure.getTable()
 	figurename = figure.output
+
+	response = f'{ctx.message.author.mention}, the current results are:'
 	await ctx.send(response)
 	await ctx.channel.send(file=discord.File(figurename))
 	os.remove(figurename)
 	print(f"Gave total results to {ctx.message.author}")
+
+@bot.command(name='times', pass_context=True, help="Returns the best laps!")
+async def times(ctx):
+	await ctx.send('Grabbing data...')
+
+	timedata = ACC.PullData('Celbridge ACC Points', 1)
+	timedata.authClient()
+	figure = ACC.BestTimes(timedata.getDataFrame())
+	figure.getTable()
+	figurename = figure.output
+
+	response = f'{ctx.message.author.mention}, the current fastest times are:'
+	await ctx.send(response)
+	await ctx.channel.send(file=discord.File(figurename))
+	os.remove(figurename)
+	print(f"Gave times to {ctx.message.author}")
 
 bot.run(TOKEN)
