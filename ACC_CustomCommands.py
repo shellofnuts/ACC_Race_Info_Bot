@@ -17,7 +17,7 @@ class PullData:
         self.sheetName = sheetname
         self.sheetNum = sheetnum
         self.SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-        self.CREDS = ServiceAccountCredentials.from_json_keyfile_name('acc-celbridge-project-sheetskey.json', self.SCOPES)
+        self.CREDS = ServiceAccountCredentials.from_json_keyfile_name('acc-project-sheetskey.json', self.SCOPES)
 
     def authClient(self):
         try:

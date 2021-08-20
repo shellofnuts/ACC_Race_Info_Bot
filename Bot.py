@@ -13,7 +13,7 @@ Objectives:
 
 ### Import dependenies
 
-
+import json
 import os
 import discord
 from discord.ext import commands
@@ -25,19 +25,19 @@ nest_asyncio.apply()
 
 ### Load tokens and relative info
 
-load_dotenv("discord_tokens.env")
-TOKEN = os.getenv('DISCORD_TOKEN')
-SERVER = os.getenv('DISCORD_SERVER')
+with open('discord_ids.json') as json_file:
+	disIDs = json.load(json_file)
+
+TOKEN = disIDs['DISCORD_TOKEN']
+SERVER = disIDs['DISCORD_SERVER']
+SHEET = disIDs['GOOGLE_SHEET']
+
 
 print(f'{TOKEN} \n{SERVER}')
 
 ### INITIALISE BOT
 
 bot = commands.Bot(command_prefix='!')
-
-### Discord IDs
-
-disIDs = [761495523898556427, 246290545348050945, 374245587387809793]
 
 ### BOT EVENTS
 
@@ -49,7 +49,11 @@ async def on_ready():
 async def on_message(message):
 	if message.author == bot.user:
 		return
-	if not message.content.startswith('!') and message.author.id in disIDs and message.channel.id == 876749209339047936: 	#	Ignores commands
+	if (not message.content.startswith('!') and
+			message.author.id in disIDs['KEKW_USER_ID'] and
+			message.channel.id in disIDs['DISCORD_CHANNELS']):
+			#Ignores commands and targets specific users & channel
+
 		emoji = discord.utils.get(message.guild.emojis, name='KEKW')
 		await message.add_reaction(emoji)
 		print(f'Reacted to {message.author} with KEKW')
@@ -72,7 +76,7 @@ async def test_response(ctx):
 async def standings(ctx):
 	await ctx.send('Grabbing data...')
 
-	results = ACC.PullData('Celbridge ACC Points', 0)
+	results = ACC.PullData(SHEET, 0)
 	results.authClient()
 	figure = ACC.Standings(results.getDataFrame())
 	figure.getTable()
@@ -88,7 +92,7 @@ async def standings(ctx):
 async def total_results(ctx):
 	await ctx.send('Grabbing data...')
 
-	results = ACC.PullData('Celbridge ACC Points', 0)
+	results = ACC.PullData(SHEET, 0)
 	results.authClient()
 	figure = ACC.RaceResults(results.getDataFrame())
 	figure.getTable()
@@ -104,7 +108,7 @@ async def total_results(ctx):
 async def times(ctx):
 	await ctx.send('Grabbing data...')
 
-	timedata = ACC.PullData('Celbridge ACC Points', 1)
+	timedata = ACC.PullData(SHEET, 1)
 	timedata.authClient()
 	figure = ACC.BestTimes(timedata.getDataFrame())
 	figure.getTable()
