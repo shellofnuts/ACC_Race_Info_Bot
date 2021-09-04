@@ -4,3 +4,9 @@ discord_tokens.env
 *.json
 
 RaceResults.csv
+
+BestTimes.png
+
+CurrentStandings.png
+
+RaceResults.png

@@ -1,6 +1,8 @@
 ### Import dependencies
 
 import json
+from typing import List
+
 import gspread
 import pandas as pd
 from oauth2client.service_account import ServiceAccountCredentials
@@ -8,18 +10,21 @@ import matplotlib.pyplot as plt
 from matplotlib.transforms import Bbox
 import numpy as np
 
+
+
+
 ### Classes
 from pandas import DataFrame
 
 
 class PullData:
-    def __init__(self, sheetname: str, sheetnum: int):
+    def __init__(self, sheetname: str, sheetnum: int = 0):
         self.sheetName = sheetname
         self.sheetNum = sheetnum
         self.SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
         self.CREDS = ServiceAccountCredentials.from_json_keyfile_name('acc-project-sheetskey.json', self.SCOPES)
 
-    def authClient(self):
+    def authClient(self) -> None:
         try:
             client = gspread.authorize(self.CREDS)
             self.sheet = client.open(self.sheetName)
@@ -28,17 +33,17 @@ class PullData:
             print('Error occured in authorisation')
             return
 
-    def getDataFrame(self):
-        records: DataFrame = pd.DataFrame.from_dict(self.sheet.get_worksheet(self.sheetNum).get_all_records())
-        return records
+    def getDataFrame(self) -> pd.DataFrame:
+        records: pd.DataFrame = pd.DataFrame.from_dict(self.sheet.get_worksheet(self.sheetNum).get_all_records())
+        return records.copy()
 
 
 class Standings:
-    def __init__(self, dataframe: DataFrame):
-        self.leaderboard = dataframe.copy()
+    def __init__(self, dataframe: pd.DataFrame):
+        self.leaderboard: pd.DataFrame = dataframe.copy()
         self.leaderboard = self.leaderboard[['Drivers', 'Total']]
         self.leaderboard.sort_values('Total', axis=0, inplace=True, ascending=False, ignore_index=True)
-        self.output = 'CurrentStandings.png'
+        self.output: str  = 'CurrentStandings.png'
 
     def getTable(self):
         colours = ['gold', 'lightsteelblue', 'peru']
@@ -56,7 +61,10 @@ class Standings:
                                colLabels=['Drivers', 'Total'],
                                loc='center',
                                colWidths=[0.2, 0.2])
-        the_figure.scale(1, 1.5)
+        the_figure.scale(1.5, 2)
+        the_figure.auto_set_font_size(False)
+        the_figure.set_fontsize(12)
+        the_figure.auto_set_column_width(col=list(range(len(self.leaderboard.columns))))
 
         plt.gcf().canvas.draw()
         points = the_figure.get_window_extent(plt.gcf()._cachedRenderer).get_points()
@@ -70,8 +78,8 @@ class Standings:
         plt.clf()
 
 class RaceResults:
-    def __init__(self, dataframe: DataFrame):
-        self.output = 'CurrentResults.png'
+    def __init__(self, dataframe: pd.DataFrame):
+        self.output: str = 'RaceResults.png'
 
         self.results = dataframe.copy()
         self.results.replace("", np.nan, inplace=True)
@@ -100,6 +108,9 @@ class RaceResults:
                                colLabels=self.results.columns.values,
                                loc='center')
         the_figure.scale(1, 1.5)
+        the_figure.auto_set_font_size(False)
+        the_figure.set_fontsize(12)
+        the_figure.auto_set_column_width(col=list(range(len(self.results.columns))))
 
         plt.gcf().canvas.draw()
         points = the_figure.get_window_extent(plt.gcf()._cachedRenderer).get_points()
@@ -113,22 +124,18 @@ class RaceResults:
                     dpi=100)
         plt.clf()
 
+
 class BestTimes:
-    def __init__(self, dataframe: DataFrame):
-        self.times = dataframe
-        print(self.times.head())
-        self.output = 'TimesTable.png'
+    def __init__(self, dataframe: pd.DataFrame) -> None:
+        self.times: pd.DataFrame = dataframe.copy()
+        self.output: str = 'BestTimes.png'
         tracks = self.times.columns.values
         tracks = tracks[~self.times.columns.str.contains('Track')]
-
-
 
         new_cols = []
         for i in np.arange(0, len(tracks), 2):
             new_cols.append(f'{tracks[i]}: {self.times.iat[0, i + 1]}')
             new_cols.append(f'{tracks[i]}: {self.times.iat[0, i + 2]}')
-
-        #self.times.replace(np.nan, "", inplace=True)
 
         self.times = self.times[1:]
         self.times.set_index('Track', inplace=True)
@@ -150,7 +157,7 @@ class BestTimes:
 
         return colormap, colcolours, rowcolours
 
-    def getTable(self):
+    def getTable(self) -> None:
         ax = plt.gca()
         ax.get_xaxis().set_visible(False)
         ax.get_yaxis().set_visible(False)
@@ -185,3 +192,50 @@ class BestTimes:
                     pad_inches=3,
                     dpi=100)
         plt.clf()
+
+class UpdateFigures:
+    """
+    The UpdateFigures class concatenates the classes into one admin command.
+    This reduces the number of requests to the Google Spreadsheet, thus allowing for faster returns.
+    Since updates mainly occur after races, no need to poll the spreadsheet many times.
+
+    Introducing a poll for the times command may be beneficial.
+    This might implemented in the future
+    """
+
+    def __init__(self, spreadsheet: str, section: str = 'all'):
+        """
+        :type section: str
+        :type spreadsheet: str
+        """
+        self.section = section
+        self.googledata = PullData(spreadsheet)
+        self.googledata.authClient()
+
+        options = ['all', 'standings', 'results', 'times']
+        self.updated_images: List[str] = []
+
+        if self.section not in options:
+            raise Exception
+
+        if self.section == "standings" or "all":
+            standings_command = Standings(self.googledata.getDataFrame())
+            standings_command.getTable()
+            self.updated_images.append(standings_command.output)
+            plt.clf()
+
+        if self.section == "results" or "all":
+            results_command = RaceResults(self.googledata.getDataFrame())
+            results_command.getTable()
+            self.updated_images.append(results_command.output)
+            plt.clf()
+
+        if self.section == "times" or "all":
+            self.googledata.sheetNum = 1
+            times_command = BestTimes(self.googledata.getDataFrame())
+            times_command.getTable()
+            self.updated_images.append(times_command.output)
+            plt.clf()
+
+
+
