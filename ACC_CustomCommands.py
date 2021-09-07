@@ -19,12 +19,23 @@ from pandas import DataFrame
 
 class PullData:
     def __init__(self, sheetname: str, sheetnum: int = 0):
+        """
+
+        :param sheetname: Name of Google Sheet to access.
+        :param sheetnum: The page number to access.
+        """
         self.sheetName = sheetname
         self.sheetNum = sheetnum
         self.SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
         self.CREDS = ServiceAccountCredentials.from_json_keyfile_name('acc-project-sheetskey.json', self.SCOPES)
 
     def authClient(self) -> None:
+        """
+
+        :return: None. Prints success/failure to console.
+        
+        Connects to Google Spreadsheets and accesses the named spreadsheet.
+        """
         try:
             client = gspread.authorize(self.CREDS)
             self.sheet = client.open(self.sheetName)
@@ -34,6 +45,10 @@ class PullData:
             return
 
     def getDataFrame(self) -> pd.DataFrame:
+        """
+
+        :return: Copy of records DataFrame
+        """
         records: pd.DataFrame = pd.DataFrame.from_dict(self.sheet.get_worksheet(self.sheetNum).get_all_records())
         return records.copy()
 
@@ -45,7 +60,13 @@ class Standings:
         self.leaderboard.sort_values('Total', axis=0, inplace=True, ascending=False, ignore_index=True)
         self.output: str  = 'CurrentStandings.png'
 
-    def getTable(self):
+    def getTable(self) -> None:
+        """
+
+        :return: Returns None on image creation
+        
+        Method creates League Standings table. Saves to main directory as CurrentStandings.png
+        """
         colours = ['gold', 'lightsteelblue', 'peru']
         for i in range(len(self.leaderboard.index.values) - 3):
             colours.append('gainsboro')
@@ -76,9 +97,15 @@ class Standings:
                     pad_inches=3,
                     dpi=100)
         plt.clf()
+        return None
 
 class RaceResults:
     def __init__(self, dataframe: pd.DataFrame):
+        """
+
+        :param dataframe: Input DataFrame containing the record of race results.
+        :type dataframe: pd.DataFrame
+        """
         self.output: str = 'RaceResults.png'
 
         self.results = dataframe.copy()
@@ -96,7 +123,13 @@ class RaceResults:
             self.colormap[rightpart == places[i]] =  colours[i]
         self.colormap[self.colormap == 0] = colours[-1]
 
-    def getTable(self):
+    def getTable(self) -> None:
+        """
+
+        :return: Returns None on image creation
+        
+        Method creates table of race results. Saves to main directory as RaceResults.png
+        """
         ax = plt.gca()
         ax.get_xaxis().set_visible(False)
         ax.get_yaxis().set_visible(False)
@@ -123,10 +156,16 @@ class RaceResults:
                     pad_inches=3,
                     dpi=100)
         plt.clf()
+        return None
 
 
 class BestTimes:
     def __init__(self, dataframe: pd.DataFrame) -> None:
+        """
+        
+        :param dataframe: Input DataFrame
+        :type dataframe: pd.DataFrame
+        """
         self.times: pd.DataFrame = dataframe.copy()
         self.output: str = 'BestTimes.png'
         tracks = self.times.columns.values
@@ -145,6 +184,10 @@ class BestTimes:
         self.rightpart = self.times.to_numpy()
 
     def getColours(self):
+        """
+
+        :return: colourmap, column colours and row colours
+        """
         colours = ['deeppink', 'gainsboro']
         colormap = np.zeros_like(self.rightpart)
         colormap[colormap == 0] = colours[-1]
@@ -192,6 +235,7 @@ class BestTimes:
                     pad_inches=3,
                     dpi=100)
         plt.clf()
+        return None
 
 class UpdateFigures:
     """
@@ -204,10 +248,6 @@ class UpdateFigures:
     """
 
     def __init__(self, spreadsheet: str, section: str = 'all'):
-        """
-        :type section: str
-        :type spreadsheet: str
-        """
         self.section = section
         self.googledata = PullData(spreadsheet)
         self.googledata.authClient()
