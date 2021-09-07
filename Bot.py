@@ -17,7 +17,6 @@ import json
 import os
 import discord
 from discord.ext import commands
-from dotenv import load_dotenv
 import ACC_CustomCommands as ACC
 from datetime import datetime
 
@@ -26,7 +25,9 @@ nest_asyncio.apply()
 
 ### Load tokens and relative info
 
-with open('discord_ids.json') as json_file:
+token_directory = 'Tokens/'
+
+with open(token_directory+'discord_ids.json') as json_file:
 	disIDs = json.load(json_file)
 	json_file.close()
 
@@ -36,6 +37,7 @@ SHEET = disIDs['GOOGLE_SHEET']
 IMAGES = disIDs['RESULTS_IMAGES']
 ADMIN_IDS = disIDs['ADMIN_ROLES']
 SCHEDULE = disIDs['SCHEDULE']
+GOOGLE_TOKEN = disIDs['GOOGLE_TOKEN_NAME']
 
 
 
@@ -43,7 +45,9 @@ print(f'{TOKEN} \n{SERVER}')
 
 ### INITIALISE BOT
 
-bot = commands.Bot(command_prefix='!')
+intents = discord.Intents.default()
+intents.members = True
+bot = commands.Bot(command_prefix="!", intents=intents)
 
 ### DEFINE BOT EVENTS
 
@@ -53,6 +57,12 @@ async def on_ready():
 	
 @bot.event
 async def on_message(message):
+	"""
+	Function to react to specific users (in a specific channel) with a custom emoji. Just for fun.
+
+	:param message: discord.Message object. Passes through the message and additional context information
+	:return: None
+	"""
 	if message.author == bot.user:
 		return
 	if (not message.content.startswith('!') and
@@ -66,17 +76,6 @@ async def on_message(message):
 	await bot.process_commands(message)
 
 ### BOT COMMANDS
-
-@bot.command(name='test', pass_context=True, help='Test command to make sure the bot is working')
-async def test_response(ctx):
-	response = 'This is a test'
-	if ctx.message.author.id in disIDs:
-		emoji = discord.utils.get(ctx.message.guild.emojis, name='KEKW')
-		print(f'Replied KEKW to {ctx.message.author}')
-		await ctx.message.add_reaction(emoji)
-		return
-	await ctx.send(response + f' {ctx.message.author.mention}!')
-	print(f'Replied to {ctx.message.author} on {ctx.message.guild} in {ctx.message.channel.name}')
 
 @bot.command(name='standings', pass_context=True, help="Returns the current league standings.")
 async def standings(ctx):
@@ -106,6 +105,14 @@ async def times(ctx):
 
 @bot.command(name="update", pass_context=True, help="Admin command to update figures. Arguments are: [all, standings, results, times, when]. \n Default is all. \"when\" returns last update.")
 async def update_figures(ctx, sections: str = 'all'):
+	"""
+	Function to update the league figures. Only accessible to certain roles defined in discord_ids.json.
+	This is to reduce calls to Google API and increase response time with pre-made images. Matplotlib is also quite slow to produce tables.
+
+	:param ctx: discord.Message object. Contains information on message and context.
+	:param sections: Defines what to update. sections = 'all', 'standings', 'results', 'times' or 'when'
+	:return: None. Will return a statement to the Discord user and output any errors to the console.
+	"""
 	if (ADMIN_IDS in [y.id for y in ctx.message.author.roles] or
 			ctx.message.author.guild_permissions.administrator):
 		if sections == "when":
@@ -116,7 +123,7 @@ async def update_figures(ctx, sections: str = 'all'):
 			await ctx.send(response)
 			return
 		try:
-			updated_images = ACC.UpdateFigures(SHEET, sections)
+			updated_images = ACC.UpdateFigures(token_directory+GOOGLE_TOKEN, SHEET, sections)
 			for i in updated_images.updated_images:
 				IMAGES[i] = datetime.now().strftime('%Y-%m-%d-%H:%M:%S')
 				disIDs["RESULTS_IMAGES"][i] = IMAGES[i]
@@ -129,8 +136,21 @@ async def update_figures(ctx, sections: str = 'all'):
 			print(f"Updated {sections} for {ctx.message.author} on {ctx.message.guild} in {ctx.message.channel.name}")
 		except Exception as exception_message:
 			print(exception_message)
-			await ctx.send(f"Unknown argument {ctx.message.author.mention}.")
-			return
+			if exception_message.__str__() == 'Argument not in list':
+				# Did the user input an incorrect argument?
+				await ctx.send(f'Hey {ctx.message.author.mention}, you used the wrong argument.\nUse !help to see them.')
+				return
+			else:
+				try:
+					# Try to mention one of the league admins that a problem occurred.
+					role_id = ADMIN_IDS[0]
+					tech_role = discord.utils.get(ctx.guild.roles, id=role_id)
+					await ctx.send(f'Hey {ctx.message.author.mention}, I got an error with that. Please let one of the {tech_role.mention}')
+				except:
+					# If league admins cannot be mentioned, tell user to inform server owner. (Server owner is not mentioned. Just don't @ server owners.)
+					guild_owner: discord.Member = ctx.message.guild.owner
+					await ctx.send(f'Hey {ctx.message.author.mention}, I got an error. Please inform the boss {guild_owner.display_name}.')
+				return
 
 @bot.command(name='schedule', pass_context=True, help="Know the schedule of upcoming races.")
 async def schedule(ctx):

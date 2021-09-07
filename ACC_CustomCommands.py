@@ -18,16 +18,16 @@ from pandas import DataFrame
 
 
 class PullData:
-    def __init__(self, sheetname: str, sheetnum: int = 0):
+    def __init__(self, dir_file: str, sheetname: str, sheetnum: int = 0):
         """
-
+        :param dir: Directory to access the API tokens
         :param sheetname: Name of Google Sheet to access.
         :param sheetnum: The page number to access.
         """
         self.sheetName = sheetname
         self.sheetNum = sheetnum
         self.SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-        self.CREDS = ServiceAccountCredentials.from_json_keyfile_name('acc-project-sheetskey.json', self.SCOPES)
+        self.CREDS = ServiceAccountCredentials.from_json_keyfile_name(dir_file, self.SCOPES)
 
     def authClient(self) -> None:
         """
@@ -166,7 +166,7 @@ class BestTimes:
         :param dataframe: Input DataFrame
         :type dataframe: pd.DataFrame
         """
-        self.times: pd.DataFrame = dataframe.copy()
+        self.times: pd.DataFrame = dataframe.dropna(axis=1)
         self.output: str = 'BestTimes.png'
         tracks = self.times.columns.values
         tracks = tracks[~self.times.columns.str.contains('Track')]
@@ -247,16 +247,16 @@ class UpdateFigures:
     This might implemented in the future
     """
 
-    def __init__(self, spreadsheet: str, section: str = 'all'):
-        self.section = section
-        self.googledata = PullData(spreadsheet)
-        self.googledata.authClient()
-
+    def __init__(self, dir_file, spreadsheet: str, section: str = 'all'):
         options = ['all', 'standings', 'results', 'times']
         self.updated_images: List[str] = []
 
         if self.section not in options:
-            raise Exception
+            raise Exception('Argument not in list')
+
+        self.section = section
+        self.googledata = PullData(dir_file, spreadsheet)
+        self.googledata.authClient()
 
         if self.section == "standings" or "all":
             standings_command = Standings(self.googledata.getDataFrame())
